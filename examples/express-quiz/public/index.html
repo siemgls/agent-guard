@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo Quiz</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; line-height: 1.5; }
+    fieldset { border: 1px solid #d0d7de; border-radius: 8px; margin: 0 0 20px; padding: 12px 16px; }
+    legend { font-weight: 600; padding: 0 4px; }
+    label { display: block; margin: 4px 0; }
+    input[type=text], textarea { width: 100%; box-sizing: border-box; padding: 8px; font: inherit; }
+    button { font: inherit; padding: 8px 20px; }
+  </style>
+  <!-- agent-guard: one script tag -->
+  <script src="/agent-guard/client.js"></script>
+</head>
+<body>
+  <h1>Space Basics Quiz</h1>
+  <form id="quiz" method="post" action="/quiz/submit">
+    <fieldset>
+      <legend>Your name</legend>
+      <input type="text" name="name" id="name" autocomplete="off">
+    </fieldset>
+    <fieldset>
+      <legend>1. Which planet is closest to the Sun?</legend>
+      <label><input type="radio" name="q1" value="venus"> Venus</label>
+      <label><input type="radio" name="q1" value="mercury"> Mercury</label>
+      <label><input type="radio" name="q1" value="mars"> Mars</label>
+    </fieldset>
+    <fieldset>
+      <legend>2. Roughly how long does sunlight take to reach Earth?</legend>
+      <label><input type="radio" name="q2" value="8s"> 8 seconds</label>
+      <label><input type="radio" name="q2" value="8m"> 8 minutes</label>
+      <label><input type="radio" name="q2" value="8h"> 8 hours</label>
+    </fieldset>
+    <fieldset>
+      <legend>3. In one or two sentences: why does the Moon show phases?</legend>
+      <textarea name="q3" id="q3" rows="3"></textarea>
+    </fieldset>
+    <button type="submit">Submit</button>
+  </form>
+  <script>
+    // Make sure the last signals arrive before the server checks the verdict.
+    document.getElementById('quiz').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await window.agentGuard?.flush();
+      e.target.submit();
+    });
+  </script>
+</body>
+</html>

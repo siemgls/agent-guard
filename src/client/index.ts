@@ -55,7 +55,13 @@ function readEnv(): EnvSignals {
     webdriver: navigator.webdriver === true,
     automationGlobals: found,
     headlessUA: /Headless/i.test(navigator.userAgent),
-    zeroOuterSize: window.outerWidth === 0 && window.outerHeight === 0,
+    // Headless: no outer window but a real viewport. Real browsers also report 0
+    // while minimized or in a background tab, so only trust it while visible.
+    zeroOuterSize:
+      document.visibilityState === 'visible' &&
+      window.outerWidth === 0 &&
+      window.outerHeight === 0 &&
+      window.innerWidth > 0,
     touchPrimary: matchMedia?.('(pointer: coarse)').matches ?? false,
   };
 }

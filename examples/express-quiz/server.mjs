@@ -16,6 +16,7 @@ app.use(express.static(fileURLToPath(new URL('./public', import.meta.url))));
 // 2. Check the session when the quiz is submitted
 app.post('/quiz/submit', async (req, res) => {
   const result = await req.agentGuard.check();
+  req.agentGuard.end(); // next attempt gets a fresh session
 
   // A real site would save the answers either way and show `result` to the
   // teacher only, never to the student. Shown here so you can see it work.

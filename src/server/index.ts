@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +24,8 @@ export interface AgentGuardRequestInfo {
   verdict: Verdict;
   /** Ask the scoring API for the latest verdict. Never throws. */
   check(): Promise<ScoreResult>;
+  /** End this session (clears the cookie) so the next attempt starts clean. Call after check(). */
+  end(): void;
 }
 
 declare module 'http' {
@@ -41,6 +44,12 @@ let clientScript: Buffer | null = null;
 function loadClientScript(): Buffer {
   clientScript ??= readFileSync(fileURLToPath(new URL('../client.js', import.meta.url)));
   return clientScript;
+}
+
+let etag: string | null = null;
+function clientEtag(): string {
+  etag ??= `"${createHash('sha1').update(loadClientScript()).digest('base64url')}"`;
+  return etag;
 }
 
 function readCookie(req: IncomingMessage, name: string): string | null {
@@ -113,7 +122,14 @@ export function agentGuard(options: AgentGuardOptions = {}) {
 
     if (url.pathname === `${mountPath}/client.js` && req.method === 'GET') {
       res.setHeader('content-type', 'application/javascript; charset=utf-8');
-      res.setHeader('cache-control', 'public, max-age=3600');
+      // Revalidate every load so detection fixes reach browsers right away.
+      res.setHeader('cache-control', 'no-cache');
+      res.setHeader('etag', clientEtag());
+      if (req.headers['if-none-match'] === clientEtag()) {
+        res.statusCode = 304;
+        res.end();
+        return;
+      }
       res.end(loadClientScript());
       return;
     }
@@ -148,6 +164,10 @@ export function agentGuard(options: AgentGuardOptions = {}) {
         sid
           ? callApi(`/v1/sessions/${encodeURIComponent(sid)}`, { method: 'GET' }, sid)
           : Promise.resolve(unknownResult('', 'No agent-guard session (client script not loaded)')),
+      end: () => {
+        if (sid) cache.delete(sid);
+        if (!res.headersSent) res.appendHeader('set-cookie', 'ag_sid=; Path=/; Max-Age=0; SameSite=Lax');
+      },
     };
     next();
   };

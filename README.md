@@ -33,6 +33,7 @@ app.post('/quiz/submit', async (req, res) => {
   const { verdict, score, reasons } = await req.agentGuard.check();
   // Save the answers either way. If verdict is 'flag' or 'pause',
   // mark the attempt for teacher review and store `reasons` with it.
+  req.agentGuard.end(); // the next attempt starts a clean session
 });
 ```
 

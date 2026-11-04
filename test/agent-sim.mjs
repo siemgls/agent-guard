@@ -25,6 +25,19 @@ await runAgent('Naive agent', {}, async (page) => {
   await page.fill('#q3', 'The Moon reflects sunlight and we see different parts of the lit half as it orbits Earth.');
 });
 
+// Inserts text straight into fields with no key events, in several chunks.
+await runAgent('Insert-text agent', {}, async (page) => {
+  await page.click('#name');
+  await page.keyboard.insertText('Alex');
+  await page.check('input[value=mercury]');
+  await page.check('input[value="8m"]');
+  await page.click('#q3');
+  for (const part of ['The Moon reflects sunlight. ', 'We see different parts ', 'of the lit half. ', 'It orbits Earth.']) {
+    await page.keyboard.insertText(part);
+    await page.waitForTimeout(150);
+  }
+});
+
 // 2. Stealthier agent: hides navigator.webdriver, types key by key, moves the mouse first.
 await runAgent(
   'Stealthy agent',

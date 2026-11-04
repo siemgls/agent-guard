@@ -74,6 +74,9 @@ function emptyEvents(): EventCounters {
     mouseMoves: 0,
     keydowns: 0,
     inputsWithoutKeydown: 0,
+    composedInputs: 0,
+    compositionStarts: 0,
+    processKeydowns: 0,
     pastes: 0,
     scrolls: 0,
     blurs: 0,
@@ -154,6 +157,7 @@ function start(): void {
     (e) => {
       markInteraction(e);
       events.keydowns++;
+      if (e.keyCode === 229 || e.key === 'Process') events.processKeydowns++;
       const now = performance.now();
       lastKeydownAt = now;
       if (lastKeyAt !== null) {
@@ -179,11 +183,17 @@ function start(): void {
       if (ie.inputType === 'insertFromPaste') return; // counted by 'paste'
       if (ie.inputType?.startsWith('insert') && performance.now() - lastKeydownAt > 100) {
         events.inputsWithoutKeydown++;
+        if (ie.isComposing || ie.inputType === 'insertCompositionText') events.composedInputs++;
         dirty = true;
       }
     },
     { capture: true },
   );
+
+  addEventListener('compositionstart', () => {
+    events.compositionStarts++;
+    dirty = true;
+  }, { capture: true });
 
   addEventListener('paste', (e) => {
     markInteraction(e);

@@ -30,6 +30,11 @@ export interface EventCounters {
   keydowns: number;
   /** Text inputs (insertText) with no keydown in the previous 100 ms */
   inputsWithoutKeydown: number;
+  /** Subset of inputsWithoutKeydown that came through text composition (IME, possibly dictation) */
+  composedInputs: number;
+  compositionStarts: number;
+  /** Key presses handled by an input method (keyCode 229) */
+  processKeydowns: number;
   pastes: number;
   scrolls: number;
   /** Tab/window lost focus */

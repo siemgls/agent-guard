@@ -46,6 +46,8 @@ export interface TimingStats {
   keyIntervals: number;
   keyIntervalMean: number;
   keyIntervalM2: number;
+  /** Key presses less than 15 ms after the previous one */
+  fastKeyIntervals: number;
   /** Mouse path straightness samples (0..1, 1 = perfectly straight) */
   pathSamples: number;
   pathStraightnessSum: number;
@@ -65,6 +67,8 @@ export interface SignalBatch {
   timing: TimingStats;
   /** Time from load to first trusted user interaction, ms (once known) */
   firstInteractionMs?: number;
+  /** Characters currently in the page's text fields. Length only, never the text. */
+  textLength?: number;
 }
 
 export type Verdict = 'allow' | 'flag' | 'pause' | 'unknown';

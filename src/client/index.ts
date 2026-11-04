@@ -2,6 +2,8 @@ import type { EnvSignals, EventCounters, SignalBatch, TimingStats } from '../sha
 
 const COOKIE = 'ag_sid';
 const FLUSH_INTERVAL_MS = 5000;
+const FAST_KEY_MS = 15;
+const TEXT_FIELDS = 'textarea, input:not([type]), input[type=text]';
 
 const AUTOMATION_GLOBALS = [
   '__playwright__binding__',
@@ -32,9 +34,13 @@ function getSessionId(): string {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2) + Date.now().toString(36);
-  // Session cookie so the server can match the quiz submit to these signals.
-  document.cookie = `${COOKIE}=${sid}; path=/; SameSite=Lax`;
+  writeSessionCookie(sid);
   return sid;
+}
+
+// Session cookie so the server can match the quiz submit to these signals.
+function writeSessionCookie(sid: string): void {
+  document.cookie = `${COOKIE}=${sid}; path=/; SameSite=Lax`;
 }
 
 function resolveEndpoint(): string {
@@ -84,7 +90,7 @@ function emptyEvents(): EventCounters {
 }
 
 function emptyTiming(): TimingStats {
-  return { keyIntervals: 0, keyIntervalMean: 0, keyIntervalM2: 0, pathSamples: 0, pathStraightnessSum: 0 };
+  return { keyIntervals: 0, keyIntervalMean: 0, keyIntervalM2: 0, fastKeyIntervals: 0, pathSamples: 0, pathStraightnessSum: 0 };
 }
 
 function start(): void {
@@ -105,6 +111,24 @@ function start(): void {
   const recentMoves: { x: number; y: number; t: number }[] = [];
   let lastKeydownAt = -Infinity;
   let lastKeyAt: number | null = null;
+
+  const countUntrusted = (e: Event) => {
+    if (e.isTrusted) return;
+    events.untrusted++;
+    dirty = true;
+  };
+
+  // Length only, never the text. Values set by script fire no events, so this
+  // is compared on every send instead of being driven by a listener.
+  let textLength = 0;
+  const updateTextLength = () => {
+    let total = 0;
+    document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(TEXT_FIELDS).forEach((el) => {
+      total += el.value.length;
+    });
+    if (total !== textLength) dirty = true;
+    textLength = total;
+  };
 
   const markInteraction = (e: Event) => {
     if (!e.isTrusted) events.untrusted++;
@@ -162,6 +186,7 @@ function start(): void {
       lastKeydownAt = now;
       if (lastKeyAt !== null) {
         const dt = now - lastKeyAt;
+        if (dt < FAST_KEY_MS) timing.fastKeyIntervals++;
         // Only count typing bursts, not pauses between questions.
         if (dt < 2000) {
           // Welford's online mean/variance
@@ -180,6 +205,7 @@ function start(): void {
     'input',
     (e) => {
       const ie = e as InputEvent;
+      countUntrusted(e);
       if (ie.inputType === 'insertFromPaste') return; // counted by 'paste'
       if (ie.inputType?.startsWith('insert') && performance.now() - lastKeydownAt > 100) {
         events.inputsWithoutKeydown++;
@@ -189,6 +215,8 @@ function start(): void {
     },
     { capture: true },
   );
+
+  addEventListener('change', countUntrusted, { capture: true });
 
   addEventListener('compositionstart', () => {
     events.compositionStarts++;
@@ -219,6 +247,7 @@ function start(): void {
       env: readEnv(),
       events,
       timing,
+      textLength,
     };
     if (firstInteractionMs !== undefined && !firstInteractionSent) {
       batch.firstInteractionMs = firstInteractionMs;
@@ -234,6 +263,9 @@ function start(): void {
   let inflight: Promise<void> = Promise.resolve();
 
   const send = () => {
+    // A submit in another tab clears the shared cookie; this page's session is still live.
+    writeSessionCookie(sid);
+    updateTextLength();
     if (!dirty) return;
     const body = JSON.stringify(buildBatch());
     inflight = fetch(endpoint, {
@@ -254,6 +286,7 @@ function start(): void {
   };
 
   const beacon = () => {
+    updateTextLength();
     if (!dirty) return;
     const body = JSON.stringify(buildBatch());
     if (!navigator.sendBeacon?.(endpoint, new Blob([body], { type: 'application/json' }))) {

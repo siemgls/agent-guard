@@ -38,6 +38,31 @@ await runAgent('Insert-text agent', {}, async (page) => {
   }
 });
 
+// Sets values through the DOM and fires its own events, as Claude in Chrome did when asked.
+await runAgent('DOM agent', {}, async (page) => {
+  await page.evaluate(() => {
+    const setValue = (el, value) => {
+      Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    setValue(document.querySelector('#name'), 'Alex');
+    document.querySelector('input[value=mercury]').click();
+    document.querySelector('input[value="8m"]').click();
+    setValue(document.querySelector('#q3'), 'The Moon reflects sunlight and we see different parts of its lit half.');
+  });
+});
+
+// Sets values through the DOM and fires no events at all.
+await runAgent('Silent DOM agent', {}, async (page) => {
+  await page.evaluate(() => {
+    document.querySelector('#name').value = 'Alex';
+    document.querySelector('input[value=mercury]').checked = true;
+    document.querySelector('input[value="8m"]').checked = true;
+    document.querySelector('#q3').value = 'The Moon reflects sunlight and we see different parts of its lit half.';
+  });
+});
+
 // 2. Stealthier agent: hides navigator.webdriver, types key by key, moves the mouse first.
 await runAgent(
   'Stealthy agent',
